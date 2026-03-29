@@ -8,25 +8,32 @@ if __name__ == "__main__":
     # Add the two required arguments
     parser.add_argument("model_yaml", type=str, help="Path to the model YAML file")
     parser.add_argument("data_yaml", type=str, help="Path to the dataset YAML file")
+    parser.add_argument("--resume", action="store_true", help="Resume training from last.pt")
     
     # Parse the arguments
     args = parser.parse_args()
 
-    print(f"Loading model from: {args.model_yaml}")
-    # Build a new model from the provided YAML path
-    model = YOLO(args.model_yaml)
+    if args.resume:
+        print(f"Resuming training from: {args.model_yaml}")
+        model = YOLO(args.model_yaml)
+    else:
+        print(f"Loading model from: {args.model_yaml}")
+        # Build a new model from the provided YAML path
+        model = YOLO(args.model_yaml)
 
     print(f"Starting training with dataset: {args.data_yaml} ...")
     # Train the model using the parsed data path and your fixed parameters
     results = model.train(
         data=args.data_yaml,
+        resume=args.resume,
         project="",
         epochs=400,
-        batch=16,
+        batch=32,
+        device=[0, 1], 
         optimizer='SGD',
         pretrained=False,
         imgsz=640,
-        # workers=12,
+        workers=16,
         iou=0.4
     )
 
