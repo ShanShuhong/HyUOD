@@ -2250,3 +2250,52 @@ class C3k2_wcpm(nn.Module):
         y = [y[0], y[1]]
         y.extend(m(y[-1]) for m in self.m)
         return self.cv2(torch.cat(y, 1))
+
+class CrossAttentionFusion(nn.Module):
+    def __init__(self, c1, c2):
+        """
+        跨模态交叉注意力融合模块
+        c1: 输入通道列表 [c_rgb, c_t, c_a]
+        c2: 输出通道数 (通常设为 c_rgb + c_t + c_a 以保持与 Concat 兼容)
+        """
+        super().__init__()
+        self.c_rgb, self.c_t, self.c_a = c1
+        
+        # 特征对齐
+        self.conv_rgb = Conv(self.c_rgb, self.c_rgb, 1)
+        self.conv_phys = Conv(self.c_t + self.c_a, self.c_rgb, 1) # 将物理分量融合并对齐到 RGB 维度
+        
+        # 空间交叉注意力：利用 T/A 告诉模型哪里更模糊，需要加强特征提取
+        self.spatial_attn = nn.Sequential(
+            nn.Conv2d(self.c_rgb * 2, 1, kernel_size=7, padding=3, bias=False),
+            nn.Sigmoid()
+        )
+        
+        # 通道交叉注意力：利用 T/A 告诉模型哪些通道受颜色失真影响大
+        self.channel_attn = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(self.c_rgb, self.c_rgb // 4, 1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(self.c_rgb // 4, self.c_rgb, 1, bias=False),
+            nn.Sigmoid()
+        )
+        
+        # 最后的输出映射，保持与后续层兼容
+        self.cv_out = Conv(self.c_rgb, c2, 1)
+
+    def forward(self, x):
+        rgb, t, a = x # 接收来自不同层的特征
+        
+        # 物理先验融合
+        phys = torch.cat([t, a], dim=1)
+        phys_feat = self.conv_phys(phys)
+        
+        # 1. 空间注意力：RGB 询问 Phys "哪里需要关注？"
+        spatial_weights = self.spatial_attn(torch.cat([rgb, phys_feat], dim=1))
+        rgb = rgb * spatial_weights
+        
+        # 2. 通道注意力：Phys 引导 RGB 的特征响应
+        channel_weights = self.channel_attn(phys_feat)
+        rgb = rgb * channel_weights
+        
+        return self.cv_out(rgb)
