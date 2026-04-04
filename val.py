@@ -30,3 +30,5 @@ if __name__ == "__main__":
         conf=args.conf
     )
     print("Validation completed successfully!")
+
+    #python val.py runs/detect/train15/weights/best.pt test_yaml/test.yaml
