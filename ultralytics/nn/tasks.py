@@ -71,6 +71,8 @@ from ultralytics.nn.modules import (
     t_block,
     A_block,
     C3k2_wcpm,
+    C3k2_DSConv,
+    C3k2_PConv,
 )
 from ultralytics.nn.modules.block import CrossAttentionFusion
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
@@ -1147,7 +1149,8 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             t_block,
             A_block,
             C3k2_wcpm,
-            CrossAttentionFusion,
+            C3k2_DSConv,
+            C3k2_PConv,
         }
     )
     repeat_modules = frozenset(  # modules with 'repeat' arguments
@@ -1167,7 +1170,9 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             C2fCIB,
             C2PSA,
             A2C2f,
-            C3k2_wcpm
+            C3k2_wcpm,
+            C3k2_DSConv,
+            C3k2_PConv,
         }
     )
     for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
@@ -1195,7 +1200,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             if m in repeat_modules:
                 args.insert(2, n)  # number of repeats
                 n = 1
-            if m is C3k2:  # for M/L/X sizes
+            if m is C3k2 or m is C3k2_DSConv or m is C3k2_PConv:  # for M/L/X sizes
                 legacy = False
                 if scale in "mlx":
                     args[3] = True
@@ -1217,6 +1222,12 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             args = [ch[f]]
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
+        elif m is CrossAttentionFusion:
+            c1 = [ch[x] for x in f]
+            c2 = args[0]
+            if c2 != nc:
+                c2 = make_divisible(min(c2, max_channels) * width, 8)
+            args = [c1, c2, *args[1:]]
         elif m in frozenset({Detect, WorldDetect, Segment, Pose, OBB, ImagePoolingAttn, v10Detect}):
             args.append([ch[x] for x in f])
             if m is Segment:

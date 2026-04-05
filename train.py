@@ -27,14 +27,18 @@ if __name__ == "__main__":
         data=args.data_yaml,
         resume=args.resume,
         project="",
+        seed=42,
+        deterministic=True, # Ensure reproducibility
         epochs=400,
-        batch=32,
-        device=[0, 1], 
+        batch=32, # Successfully restored to 32 thanks to PConv
+        device=0, # Single GPU mode
         optimizer='SGD',
         pretrained=False,
         imgsz=640,
-        workers=16,
-        iou=0.4
+        workers=8, # Optimized for system stability
+        cache='ram',
+        iou=0.4,
+        amp=True
     )
 
 # # Load a model
