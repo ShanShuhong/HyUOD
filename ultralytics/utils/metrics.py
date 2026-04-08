@@ -49,6 +49,32 @@ def bbox_ioa(box1, box2, iou=False, eps=1e-7):
     return inter_area / (area + eps)
 
 
+def bbox_nwd(box1, box2, eps=1e-6):
+    """
+    Calculate Normalized Wasserstein Distance (NWD) between bounding boxes.
+    Args:
+        box1 (torch.Tensor): bounding boxes, Shape: [..., 4].
+        box2 (torch.Tensor): bounding boxes, Shape: [..., 4].
+    Returns:
+        nwd (torch.Tensor): NWD between box1 and box2.
+    """
+    b1_x1, b1_y1, b1_x2, b1_y2 = box1.chunk(4, -1)
+    b2_x1, b2_y1, b2_x2, b2_y2 = box2.chunk(4, -1)
+    
+    b1_w, b1_h = b1_x2 - b1_x1, b1_y2 - b1_y1
+    b2_w, b2_h = b2_x2 - b2_x1, b2_y2 - b2_y1
+    
+    b1_cx, b1_cy = (b1_x1 + b1_x2) / 2, (b1_y1 + b1_y2) / 2
+    b2_cx, b2_cy = (b2_x1 + b2_x2) / 2, (b2_y1 + b2_y2) / 2
+    
+    # NWD
+    wass_dist = (b1_cx - b2_cx)**2 + (b1_cy - b2_cy)**2 + \
+                ((b1_w/2) - (b2_w/2))**2 + ((b1_h/2) - (b2_h/2))**2
+                
+    nwd = torch.exp(-torch.sqrt(wass_dist + eps) / 12.8)
+    return nwd
+
+
 def box_iou(box1, box2, eps=1e-7):
     """
     Calculate intersection-over-union (IoU) of boxes. Both sets of boxes are expected to be in (x1, y1, x2, y2) format.

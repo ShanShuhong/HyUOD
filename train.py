@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="0", help="Device to run on (e.g., 0 or 0,1,2,3 or cpu)")
     parser.add_argument("--optimizer", type=str, default="SGD", choices=['SGD', 'Adam', 'AdamW', 'RMSProp'], help="Optimizer to use (default: SGD)")
     parser.add_argument("--resume", action="store_true", help="Resume training from last.pt")
-    parser.add_argument("--workers", type=int, default=8, help="Number of data loading workers (default: 8)")
+    parser.add_argument("--workers", type=int, default=16, help="Number of data loading workers (default: 8)")
     parser.add_argument("--project", type=str, default="runs/train", help="Project name for saving results")
     parser.add_argument("--name", type=str, default="hyuod_experiment", help="Experiment name")
     parser.add_argument("--pretrained", action="store_true", help="Use pretrained weights if available")

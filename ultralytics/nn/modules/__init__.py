@@ -82,6 +82,7 @@ from .conv import (
     RepConv,
     SpatialAttention,
     First_Conv,
+    SPDConv,  # space-to-depth added
 )
 from .head import OBB, Classify, Detect, Pose, RTDETRDecoder, Segment, WorldDetect, v10Detect
 from .transformer import (
@@ -178,4 +179,5 @@ __all__ = (
     "First_Conv",
     "frequent_block",
     "C3k2_wcpm",
+    "SPDConv",
 )

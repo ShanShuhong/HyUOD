@@ -23,6 +23,7 @@ __all__ = (
     "RepConv",
     "Index",
     "First_Conv",
+    "SPDConv",
 )
 
 
@@ -824,3 +825,15 @@ class C2f_DCNV3(nn.Module):
         y.extend(m(y[-1]) for m in self.m)
         return self.cv2(torch.cat(y, 1))
 '''
+
+
+class SPDConv(nn.Module):
+    # Space-to-Depth Convolution
+    def __init__(self, inc=64, ouc=128, k=1, s=1, p=None, g=1, d=1):
+        super().__init__()
+        self.conv = Conv(inc * 4, ouc, k, s, p, g, d)
+
+    def forward(self, x):
+        x = torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1)
+        return self.conv(x)
+

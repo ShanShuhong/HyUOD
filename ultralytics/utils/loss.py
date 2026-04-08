@@ -9,7 +9,7 @@ from ultralytics.utils.ops import crop_mask, xywh2xyxy, xyxy2xywh
 from ultralytics.utils.tal import RotatedTaskAlignedAssigner, TaskAlignedAssigner, dist2bbox, dist2rbox, make_anchors
 from ultralytics.utils.torch_utils import autocast
 
-from .metrics import bbox_iou, probiou
+from .metrics import bbox_iou, probiou, bbox_nwd
 from .tal import bbox2dist
 
 
@@ -92,10 +92,17 @@ class BboxLoss(nn.Module):
         self.dfl_loss = DFLoss(reg_max) if reg_max > 1 else None
 
     def forward(self, pred_dist, pred_bboxes, anchor_points, target_bboxes, target_scores, target_scores_sum, fg_mask):
-        """Compute IoU and DFL losses for bounding boxes."""
+        """Compute IoU, NWD, and DFL losses for bounding boxes."""
         weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
         iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
-        loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
+        # NWD metric
+        nwd = bbox_nwd(pred_bboxes[fg_mask], target_bboxes[fg_mask])
+        
+        # Combine IoU and NWD loss. Typically they are weighted. e.g. 0.5 * IoU + 0.5 * NWD
+        # Or just replace iou with a weighted sum
+        metric = (iou + nwd) / 2
+        
+        loss_iou = ((1.0 - metric) * weight).sum() / target_scores_sum
 
         # DFL loss
         if self.dfl_loss:
