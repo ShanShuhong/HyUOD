@@ -156,15 +156,15 @@ def dehaze_V2(originPath, t_save_path, a_save_path):
             future.result()
 
 
-def main():
+if __name__ == "__main__":
     # 1. Initialize the command-line argument parser
     parser = argparse.ArgumentParser(description="Script to batch process dehazing for train and test datasets.")
     
     # 2. Add required command-line arguments
     # First argument: Main input directory for images
-    parser.add_argument("input_dir", type=str, help="Main input path for images, e.g., /path/to/dataset/images")
+    parser.add_argument("input_dir", type=str, help="Main input path for images, e.g., /opt/data/private/UOD/DUO/images")
     # Second argument: Main output directory
-    parser.add_argument("output_dir", type=str, help="Main output path, e.g., /path/to/dataset/")
+    parser.add_argument("output_dir", type=str, help="Main output path, e.g., /opt/data/private/UOD/DUO/")
     
     # 3. Parse the arguments
     args = parser.parse_args()
@@ -174,15 +174,13 @@ def main():
 
     for split in splits:
         # Construct the corresponding paths
+        # e.g., /opt/data/private/UOD/DUO/images/test
         img_path = os.path.join(args.input_dir, split) 
         
-        # Check if the input directory exists
-        if not os.path.exists(img_path):
-            print(f"Warning: Directory not found: {img_path}. Skipping.")
-            continue
-            
-        # Construct output paths
+        # e.g., /opt/data/private/UOD/DUO/t/test
         out_t_path = os.path.join(args.output_dir, "t", split)
+        
+        # e.g., /opt/data/private/UOD/DUO/a/test
         out_a_path = os.path.join(args.output_dir, "a", split)
         
         # Automatically create output directories (if they don't exist) to prevent errors
@@ -198,6 +196,3 @@ def main():
         dehaze_V2(img_path, out_t_path, out_a_path)
         
     print("All data processing complete!")
-
-if __name__ == "__main__":
-    main()

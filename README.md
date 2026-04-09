@@ -79,46 +79,23 @@ names:
   3: starfish
 ```
 
-# 🚀 Usage
+# Usage
 
-We provide a unified entry point `main.py` for all operations. Alternatively, you can run individual scripts.
-
-## 1. Data Preparation
-To accelerate the training process, we pre-generate the transmission map (`t`) and global atmospheric light (`A`). Run the following command:
-
+## 🚀 Training
+To train the model, run the following command using the provided configuration and your dataset yaml:
 ```Shell
-python main.py prep /path/to/dataset_root/images /path/to/dataset_root
-```
-*Or use the original script:* `python ta_generate.py /path/to/dataset_root/images /path/to/dataset_root`
-
-After generation, your dataset directory structure should be:
-```text
-dataset_root/
-├── images/ (train, test)
-├── labels/ (train, test)
-├── t/      (train, test)
-└── a/      (train, test)
+python train.py train_yaml/hyuod.yaml /path/to/your/data_yaml.yaml
 ```
 
-## 2. Training
-Train the model using the unified entry point:
+## 🧪 Evaluation
+
+We provide pre-trained weights for several underwater datasets (including **DUO**, **RUOD**, **SUODAC2020**, and **URPC2020**), which are located in the `weights/` directory.
+
+To evaluate a trained model, run the following command with your saved weights:
 ```Shell
-python main.py train train_yaml/hyuod.yaml /path/to/your/data_yaml.yaml --epochs 400 --batch 32 --device 0
+# Example: Evaluating on the DUO dataset using the provided pre-trained weights
+python val.py weights/DUO.pt /path/to/your/data_yaml.yaml
 ```
-*Or use the original script:* `python train.py train_yaml/hyuod.yaml /path/to/your/data_yaml.yaml`
-
-## 3. Evaluation
-Evaluate the trained model:
-```Shell
-python main.py val weights/DUO.pt /path/to/your/data_yaml.yaml --imgsz 640 --device 0
-```
-*Or use the original script:* `python val.py weights/DUO.pt /path/to/your/data_yaml.yaml`
-
-# 🛠 Key Improvements
-- **Unified CLI**: Added `main.py` for a more streamlined workflow.
-- **Flexible Training**: `train.py` and `val.py` now support more command-line arguments (epochs, batch size, device, optimizer, etc.).
-- **Robust Preprocessing**: `ta_generate.py` now includes better path handling and error warnings.
-- **Improved Logging**: Better console output during training and validation.
 
 # 📜 Citation
 
