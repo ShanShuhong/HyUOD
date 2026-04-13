@@ -22,11 +22,11 @@ if __name__ == "__main__":
         data=args.data_yaml,
         project="",
         epochs=400,
-        batch=8,
+        batch=32,
         optimizer='SGD',
         pretrained=False,
         imgsz=640,
-        workers=4,
+        workers=16,
         iou=0.4
     )
 

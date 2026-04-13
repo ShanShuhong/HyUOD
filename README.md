@@ -73,6 +73,7 @@ train_a: a/train
 val: images/test 
 nc: 4
 names:
+   
   0: holothurian
   1: echinus
   2: scallop

@@ -60,6 +60,7 @@ __all__ = (
     "A_block",
     "frequent_block",
     "C3k2_wcpm",
+    "AdaptiveEdgeWindowBlock",
 )
 
 
@@ -1869,6 +1870,99 @@ class A2C2f(nn.Module):
         if self.gamma is not None:
             return x + self.gamma.view(-1, len(self.gamma), 1, 1) * y
         return y
+
+#Ada
+class AdaptiveEdgeWindowBlock(nn.Module):
+    """Adaptive feature enhancement with background suppression, edge cues, and local window attention."""
+
+    def __init__(self, c1, c2, window=8, heads=4, e=0.5):
+        super().__init__()
+        hidden = max(int(c2 * e), 32)
+        if hidden % heads != 0:
+            hidden = (hidden // heads + 1) * heads
+
+        self.window = max(int(window), 2)
+        self.heads = heads
+        self.head_dim = hidden // heads
+
+        self.pre = Conv(c1, c2, 1, 1)
+
+        # Global-local gates for adaptive background suppression.
+        self.bg_gate = nn.Sequential(nn.AdaptiveAvgPool2d(1), nn.Conv2d(c2, c2, 1, 1, 0, bias=True), nn.Sigmoid())
+        self.sal_gate = nn.Sequential(nn.Conv2d(c2, c2, 1, 1, 0, bias=True), nn.Sigmoid())
+
+        # Fixed Sobel kernels provide explicit edge priors.
+        self.register_buffer("sobel_x", torch.tensor([[[[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]]]]))
+        self.register_buffer("sobel_y", torch.tensor([[[[-1.0, -2.0, -1.0], [0.0, 0.0, 0.0], [1.0, 2.0, 1.0]]]]))
+        self.edge_proj = Conv(c2, c2, 1, 1, act=False)
+
+        self.q = nn.Conv2d(c2, hidden, 1, 1, 0, bias=False)
+        self.k = nn.Conv2d(c2, hidden, 1, 1, 0, bias=False)
+        self.v = nn.Conv2d(c2, hidden, 1, 1, 0, bias=False)
+        self.attn_proj = Conv(hidden, c2, 1, 1, act=False)
+        self.attn_drop = nn.Dropout(0.1)
+        self.proj_drop = nn.Dropout(0.1)
+        self.temperature = nn.Parameter(torch.tensor(1.0))
+
+        # Learn normalized branch weights to avoid one branch dominating training.
+        self.fuse_logits = nn.Parameter(torch.tensor([0.0, -0.5, -0.5]))
+
+    def _edge_response(self, x):
+        c = x.shape[1]
+        gx = F.conv2d(x, self.sobel_x.repeat(c, 1, 1, 1), padding=1, groups=c)
+        gy = F.conv2d(x, self.sobel_y.repeat(c, 1, 1, 1), padding=1, groups=c)
+        mag = torch.sqrt(gx * gx + gy * gy + 1e-6)
+        # Per-channel normalization + soft-threshold to suppress texture-heavy background edges.
+        mag = mag / (F.adaptive_avg_pool2d(mag, 1) + 1e-6)
+        return torch.tanh(torch.relu(mag - 0.8))
+
+    def _window_attention(self, x):
+        b, _, h, w = x.shape
+        ws = self.window
+        ph = (ws - h % ws) % ws
+        pw = (ws - w % ws) % ws
+        if ph or pw:
+            x = F.pad(x, (0, pw, 0, ph), mode="replicate")
+        hp, wp = x.shape[-2:]
+        gh, gw = hp // ws, wp // ws
+        tokens = ws * ws
+
+        q = self.q(x)
+        k = self.k(x)
+        v = self.v(x)
+
+        def to_windows(t):
+            t = t.view(b, self.heads, self.head_dim, gh, ws, gw, ws)
+            t = t.permute(0, 3, 5, 1, 2, 4, 6).contiguous()
+            return t.view(b * gh * gw, self.heads, self.head_dim, tokens)
+
+        q_w = to_windows(q)
+        k_w = to_windows(k)
+        v_w = to_windows(v)
+
+        scale = (self.head_dim**0.5) * self.temperature.clamp(0.7, 1.5)
+        attn = torch.matmul(q_w.transpose(-2, -1), k_w) / scale
+        attn = self.attn_drop(attn.softmax(dim=-1))
+        out = torch.matmul(v_w, attn.transpose(-2, -1))
+
+        out = out.view(b, gh, gw, self.heads, self.head_dim, ws, ws)
+        out = out.permute(0, 3, 4, 1, 5, 2, 6).contiguous()
+        out = out.view(b, self.heads * self.head_dim, hp, wp)
+        out = out[:, :, :h, :w]
+        return self.proj_drop(self.attn_proj(out))
+
+    def forward(self, x):
+        x0 = self.pre(x)
+        bg_mask = self.bg_gate(x0)
+        sal_mask = self.sal_gate(x0)
+        # Residual-style suppression keeps low-contrast targets from being over-attenuated.
+        base = x0 * (1.0 - 0.5 * bg_mask)
+        sal = base * sal_mask
+        edge = self.edge_proj(self._edge_response(x0))
+        attn = self._window_attention(x0)
+        # Use normalized fusion weights for stable multi-branch contribution.
+        w = torch.softmax(self.fuse_logits, dim=0)
+        return x0 + w[0] * sal + w[1] * edge + w[2] * attn
 
 #### tA_process ####
 

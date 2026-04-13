@@ -28,7 +28,7 @@ test: # test images (optional) 1276 images
 
 # Classes
 names:
-  0: wheat_head
+  0: whea
 
 # Download script/URL (optional) ---------------------------------------------------------------------------------------
 download: |
